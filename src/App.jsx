@@ -1,5 +1,3 @@
-App.jsx
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Upload, Play, Pause, SkipBack, SkipForward, FileText } from 'lucide-react';
 
@@ -11,8 +9,11 @@ function App() {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [lyrics, setLyrics] = useState([]);
+  const [currentLyricIndex, setCurrentLyricIndex] = useState(0);
+  const [floatingLyrics, setFloatingLyrics] = useState([]);
   const [volume, setVolume] = useState(0.7);
   const [isLoading, setIsLoading] = useState(false);
+  const [showQueue, setShowQueue] = useState(false);
   
   // REFS
   const audioRef = useRef(null);
@@ -82,7 +83,6 @@ function App() {
           
           resolve(null);
         } catch (error) {
-          console.error('Error extracting album art:', error);
           resolve(null);
         }
       };
@@ -92,10 +92,15 @@ function App() {
     });
   };
 
-  // HANDLE FILE UPLOAD
+  // HANDLE FILE UPLOAD - Keep playing current song
   const handleFileUpload = async (e) => {
     const files = Array.from(e.target.files);
     setIsLoading(true);
+    
+    // Save current playback state
+    const wasPlaying = isPlaying;
+    const currentPlaybackTime = audioRef.current?.currentTime || 0;
+    const currentAudioSrc = audioRef.current?.src;
     
     const processedSongs = await Promise.all(
       files.map(async (file) => {
@@ -105,13 +110,23 @@ function App() {
           name: file.name.replace(/\.(mp3|wav|m4a|ogg|flac)$/i, ''),
           file: file,
           url: URL.createObjectURL(file),
-          coverArt: coverArt
+          coverArt: coverArt,
+          lyrics: []
         };
       })
     );
     
     const newSongs = [...songs, ...processedSongs];
     setSongs(newSongs);
+    
+    // Restore playback state immediately
+    if (audioRef.current && currentAudioSrc) {
+      audioRef.current.src = currentAudioSrc;
+      audioRef.current.currentTime = currentPlaybackTime;
+      if (wasPlaying) {
+        audioRef.current.play().catch(err => console.log('Play error:', err));
+      }
+    }
     
     if (songs.length === 0 && newSongs.length > 0) {
       setCurrentSongIndex(0);
@@ -133,15 +148,13 @@ function App() {
         const lyricsArray = content
           .split('\n')
           .map(line => line.trim())
-          .filter(line => line.length > 0)
-          .map(line => `✨ ${line} ✨`);
+          .filter(line => line.length > 0);
         
         setSongs(prevSongs => 
           prevSongs.map(song => {
             if (song.name === lyricsFileName || 
                 song.name.includes(lyricsFileName) || 
                 lyricsFileName.includes(song.name)) {
-              console.log(`Lyrics loaded for: ${song.name}`);
               return { ...song, lyrics: lyricsArray };
             }
             return song;
@@ -171,7 +184,7 @@ function App() {
         .then(() => setIsPlaying(true))
         .catch(err => {
           console.error('Play error:', err);
-          alert('Unable to play. Try clicking play again!');
+          alert('Unable to play. Try again!');
         });
     }
   };
@@ -190,13 +203,48 @@ function App() {
     setCurrentSongIndex(prevIndex);
   };
 
+  // SELECT SONG FROM QUEUE
+  const selectSong = (index) => {
+    setCurrentSongIndex(index);
+    setShowQueue(false);
+  };
+
   // SETUP AUDIO LISTENERS
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
 
-    const handleTimeUpdate = () => setCurrentTime(audio.currentTime);
-    const handleLoadedMetadata = () => setDuration(audio.duration);
+    const handleTimeUpdate = () => {
+      setCurrentTime(audio.currentTime);
+      
+      // Update lyrics based on time - continuous flow
+      if (songs[currentSongIndex]?.lyrics.length > 0) {
+        const currentLyrics = songs[currentSongIndex].lyrics;
+        // Show lyrics based on: each lyric shows for 5 seconds
+        const lyricIndex = Math.floor(audio.currentTime / 5);
+        if (lyricIndex < currentLyrics.length && lyricIndex !== currentLyricIndex) {
+          setCurrentLyricIndex(lyricIndex);
+          
+          // Add to floating lyrics array
+          const newLyric = {
+            id: Date.now() + Math.random(),
+            text: currentLyrics[lyricIndex],
+            startTime: Date.now()
+          };
+          setFloatingLyrics(prev => [...prev, newLyric]);
+          
+          // Remove after animation completes
+          setTimeout(() => {
+            setFloatingLyrics(prev => prev.filter(l => l.id !== newLyric.id));
+          }, 4000);
+        }
+      }
+    };
+    
+    const handleLoadedMetadata = () => {
+      setDuration(audio.duration);
+    };
+    
     const handleEnded = () => {
       setIsPlaying(false);
       nextSong();
@@ -211,9 +259,9 @@ function App() {
       audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
       audio.removeEventListener('ended', handleEnded);
     };
-  }, []);
+  }, [currentSongIndex, songs, currentLyricIndex]);
 
-  // HANDLE SONG CHANGES
+  // HANDLE SONG CHANGES - Auto play new song
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio || songs.length === 0) return;
@@ -223,18 +271,20 @@ function App() {
     
     setCurrentTime(0);
     setDuration(0);
+    setCurrentLyricIndex(0);
     
     audio.src = currentSong.url;
     audio.load();
     
-    if (isPlaying) {
-      setTimeout(() => {
-        audio.play().catch(err => {
+    // Always auto-play when song changes
+    setTimeout(() => {
+      audio.play()
+        .then(() => setIsPlaying(true))
+        .catch(err => {
           console.error('Auto-play error:', err);
           setIsPlaying(false);
         });
-      }, 100);
-    }
+    }, 200);
   }, [currentSongIndex, songs]);
 
   // VOLUME CONTROL
@@ -243,30 +293,6 @@ function App() {
       audioRef.current.volume = volume;
     }
   }, [volume]);
-
-  // FLOATING LYRICS
-  useEffect(() => {
-    if (!isPlaying) return;
-
-    const currentLyrics = songs[currentSongIndex]?.lyrics || defaultLyrics;
-
-    const interval = setInterval(() => {
-      const randomLyric = currentLyrics[Math.floor(Math.random() * currentLyrics.length)];
-      const newLyric = {
-        id: Date.now() + Math.random(),
-        text: randomLyric,
-        left: Math.random() * 70 + 15,
-      };
-      
-      setLyrics(prev => [...prev, newLyric]);
-      
-      setTimeout(() => {
-        setLyrics(prev => prev.filter(l => l.id !== newLyric.id));
-      }, 6000);
-    }, 2500);
-
-    return () => clearInterval(interval);
-  }, [isPlaying, currentSongIndex, songs]);
 
   // FORMAT TIME
   const formatTime = (time) => {
@@ -277,38 +303,33 @@ function App() {
   };
 
   const currentSong = songs[currentSongIndex];
+  const currentLyric = currentSong?.lyrics[currentLyricIndex] || '';
 
   return (
     <div className="app-container">
       
-      {/* Ocean Wave Background */}
       <div className="ocean-wave"></div>
 
       {/* Floating Lyrics */}
-      {lyrics.map(lyric => (
+      {floatingLyrics.map(lyric => (
         <div
           key={lyric.id}
           className="floating-lyric"
-          style={{ left: `${lyric.left}%` }}
         >
           {lyric.text}
         </div>
       ))}
 
-      {/* Main Player */}
       <div className="player-wrapper">
         
-        {/* Spotlight */}
         <div className="spotlight"></div>
         
-        {/* Vinyl Record */}
+        {/* Vinyl Record*/}
         <div className="vinyl-container">
           <div className="vinyl-record">
             
-            {/* Record Disc */}
             <div className={`record-disc ${isPlaying ? 'spinning' : ''}`}>
               
-              {/* Grooves */}
               {[...Array(12)].map((_, i) => (
                 <div
                   key={i}
@@ -322,27 +343,23 @@ function App() {
                 ></div>
               ))}
               
-              {/* Center Label */}
               <div className="center-label">
                 {currentSong?.coverArt ? (
                   <img 
                     src={currentSong.coverArt} 
                     alt="Album Cover" 
-                    className="album-cover"
+                    className="album-cover-img"
                   />
                 ) : (
-                  <div className="album-placeholder">
-                    {currentSong ? currentSong.name.slice(0, 30) : '🎵 Upload Music'}
-                  </div>
+                  <div className="album-cover-placeholder">🎵</div>
                 )}
               </div>
             </div>
             
-            {/* Tonearm */}
+            {/* Pretty Tonearm */}
             <div className={`tonearm ${isPlaying ? 'playing' : ''}`}>
               <div className="tonearm-body">
                 <div className="tonearm-needle"></div>
-                <div className="tonearm-base"></div>
               </div>
             </div>
           </div>
@@ -351,18 +368,25 @@ function App() {
         {/* Controls Card */}
         <div className="controls-card">
           
-          {/* Song Title */}
           <div className="song-title-section">
             <h2 className="song-title">
               {currentSong ? currentSong.name : 'No Song Selected'}
             </h2>
-            <p className="player-subtitle">Oceanic Vinyl Player</p>
+            <p className="player-subtitle">Upload your music library and enjoy them being played</p>
           </div>
 
-          {/* Progress Bar */}
+          {/* Progress Bar with Seek */}
           {currentSong && (
             <div className="progress-section">
-              <div className="progress-bar-container">
+              <div 
+                className="progress-bar-container"
+                onClick={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const percent = (e.clientX - rect.left) / rect.width;
+                  const newTime = percent * duration;
+                  audioRef.current.currentTime = newTime;
+                }}
+              >
                 <div 
                   className="progress-bar-fill"
                   style={{ width: `${duration > 0 ? (currentTime / duration) * 100 : 0}%` }}
@@ -405,7 +429,7 @@ function App() {
             </button>
           </div>
 
-          {/* Volume */}
+          {/* Volume Control */}
           {currentSong && (
             <div className="volume-section">
               <label className="volume-label">
@@ -423,7 +447,7 @@ function App() {
             </div>
           )}
 
-          {/* Upload Buttons */}
+          {/* Upload and Queue Buttons */}
           <div className="upload-section">
             <input
               ref={fileInputRef}
@@ -459,16 +483,46 @@ function App() {
                 <FileText size={20} />
                 Upload Lyrics
               </button>
+
+              <button
+                onClick={() => setShowQueue(!showQueue)}
+                className="upload-btn queue-btn"
+              >
+                Queue ({songs.length})
+              </button>
             </div>
             
             {songs.length > 0 && (
               <p className="song-count">
-                {songs.length} song{songs.length > 1 ? 's' : ''} loaded • Playing #{currentSongIndex + 1}
+                {songs.length} song{songs.length > 1 ? 's' : ''} in library
               </p>
             )}
           </div>
         </div>
       </div>
+
+      {/* Queue Menu */}
+      {showQueue && (
+        <div className="queue-menu">
+          <div className="queue-header">
+            <h3>Queue</h3>
+            <button onClick={() => setShowQueue(false)} className="close-btn">✕</button>
+          </div>
+          <div className="queue-list">
+            {songs.map((song, index) => (
+              <div
+                key={index}
+                onClick={() => selectSong(index)}
+                className={`queue-item ${index === currentSongIndex ? 'active' : ''}`}
+              >
+                <span className="queue-number">{index + 1}</span>
+                <span className="queue-name">{song.name}</span>
+                {index === currentSongIndex && <span className="playing-indicator">▶</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Hidden Audio */}
       <audio ref={audioRef} preload="metadata" />
