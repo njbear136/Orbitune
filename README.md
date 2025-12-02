@@ -14,3 +14,5 @@ interface, floating animated lyrics, and a beautiful ocean-inspired design.
 - ⏭️ Next/Previous track navigation
 
 Built with React, Vite, Javascript and CSS.
+
+![Uploading Screenshot 2025-12-02 120259.png…]()
