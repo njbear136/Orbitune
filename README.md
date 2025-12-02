@@ -15,4 +15,5 @@ interface, floating animated lyrics, and a beautiful ocean-inspired design.
 
 Built with React, Vite, Javascript and CSS.
 
-![Uploading Screenshot 2025-12-02 120259.png…]()
+<img width="1081" height="584" alt="Screenshot 2025-12-02 120259" src="https://github.com/user-attachments/assets/a6dc296f-2f1d-4d5c-a475-bc6c28e912cb" />
+
