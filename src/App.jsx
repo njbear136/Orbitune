@@ -143,38 +143,56 @@ function App() {
     const currentPlaybackTime = audioRef.current?.currentTime || 0;
     const currentAudioSrc = audioRef.current?.src;
     
-    for (const file of files) {
-      const lyricsFileName = file.name.replace('.txt', '');
-      const reader = new FileReader();
-      
-      reader.onload = (event) => {
-        const content = event.target.result;
-        const lyricsArray = content
-          .split('\n')
-          .map(line => line.trim())
-          .filter(line => line.length > 0);
-        
-        setSongs(prevSongs => 
-          prevSongs.map(song => {
-            if (song.name === lyricsFileName || 
-                song.name.includes(lyricsFileName) || 
-                lyricsFileName.includes(song.name)) {
-              return { ...song, lyrics: lyricsArray };
-            }
-            return song;
-          })
+    const lyricsData = await Promise.all(
+      files.map(file => {
+        return new Promise((resolve) => {
+          const lyricsFileName = file.name.replace('.txt', '');
+          const reader = new FileReader();
+          
+          reader.onload = (event) => {
+            const content = event.target.result;
+            const lyricsArray = content
+              .split('\n')
+              .map(line => line.trim())
+              .filter(line => line.length > 0);
+            
+            resolve({ fileName: lyricsFileName, lyrics: lyricsArray });
+          };
+          
+          reader.onerror = () => resolve(null);
+          reader.readAsText(file);
+        });
+      })
+    );
+    
+   
+    setSongs(prevSongs => 
+      prevSongs.map(song => {
+        const matchingLyrics = lyricsData.find(data => 
+          data && (
+            song.name === data.fileName || 
+            song.name.includes(data.fileName) || 
+            data.fileName.includes(song.name)
+          )
         );
         
-        if (audioRef.current && currentAudioSrc) {
-          audioRef.current.src = currentAudioSrc;
-          audioRef.current.currentTime = currentPlaybackTime;
-          if (wasPlaying) {
-            audioRef.current.play().catch(err => console.log('Play error:', err));
-          }
+        if (matchingLyrics) {
+          console.log(`Matched lyrics for: ${song.name}`);
+          return { ...song, lyrics: matchingLyrics.lyrics };
         }
-      };
-      
-      reader.readAsText(file);
+        return song;
+      })
+    );
+    
+    // Restore playback
+    if (audioRef.current && currentAudioSrc) {
+      setTimeout(() => {
+        audioRef.current.src = currentAudioSrc;
+        audioRef.current.currentTime = currentPlaybackTime;
+        if (wasPlaying) {
+          audioRef.current.play().catch(err => console.log('Play error:', err));
+        }
+      }, 100);
     }
   };
 
@@ -226,6 +244,8 @@ function App() {
     const audio = audioRef.current;
     if (!audio) return;
 
+    let lastLyricIndex = -1; 
+
     const handleTimeUpdate = () => {
       setCurrentTime(audio.currentTime);
       
@@ -233,14 +253,17 @@ function App() {
         const currentLyrics = songs[currentSongIndex].lyrics;
         const lyricIndex = Math.floor(audio.currentTime / 4) % currentLyrics.length;
         
-        if (lyricIndex !== currentLyricIndex) {
+       
+        if (lyricIndex !== lastLyricIndex) {
+          lastLyricIndex = lyricIndex;
           setCurrentLyricIndex(lyricIndex);
           
           const newLyric = {
-            id: Date.now() + Math.random(),
+            id: Date.now(),
             text: currentLyrics[lyricIndex],
-            startTime: Date.now()
+            position: lyricIndex % 2 // 0 for left, 1 for right
           };
+          
           setFloatingLyrics(prev => [...prev, newLyric]);
           
           setTimeout(() => {
@@ -268,7 +291,7 @@ function App() {
       audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
       audio.removeEventListener('ended', handleEnded);
     };
-  }, [currentSongIndex, songs, currentLyricIndex]);
+  }, [currentSongIndex, songs]);
 
   // HANDLE SONG CHANGES
   useEffect(() => {
@@ -317,16 +340,15 @@ function App() {
       
       <div className="ocean-wave"></div>
 
-      {showInstructions && (
-        <div className="instructions-box">
-          <button onClick={() => setShowInstructions(false)} className="close-instructions">✕</button>
-          <h3>Quick Guide</h3>
-          <p>1. Upload songs → 2. Upload lyrics (name files same as songs) → 3. Play & enjoy! Use Queue to select songs.</p>
-        </div>
-      )}
-
-      {floatingLyrics.map(lyric => (
-        <div key={lyric.id} className="floating-lyric">
+      {floatingLyrics.map((lyric) => (
+        <div 
+          key={lyric.id} 
+          className="floating-lyric"
+          style={{
+            left: lyric.position === 0 ? '15%' : 'auto',
+            right: lyric.position === 1 ? '15%' : 'auto'
+          }}
+        >
           {lyric.text}
         </div>
       ))}
@@ -334,6 +356,16 @@ function App() {
       <div className="player-wrapper">
         
         <div className="spotlight"></div>
+
+         {/* QUICK GUIDE */}
+        {showInstructions && (
+          <div className="instructions-box">
+            <button onClick={() => setShowInstructions(false)} className="close-instructions">✕</button>
+            <h4>Quick Guide ~</h4>
+            <p>1. Upload songs(mp3) → 2. Upload lyrics(txt file) with same file name as the song file → 3. Play!</p>
+            <p className="side-note">Note: Lyrics are not synced with audio (reloading the page removes everything that was uploaded)</p>
+          </div>
+        )}
         
         <div className="vinyl-container">
           <div className="vinyl-record">

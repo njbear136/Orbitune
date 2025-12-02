@@ -67,9 +67,9 @@ body {
   top: 1rem;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(8, 145, 178, 0.25);
+  background: #0dd5e440;
   backdrop-filter: blur(16px);
-  border: 1px solid rgba(34, 211, 238, 0.4);
+  border: 1px solid rgba(6, 206, 236, 0.4);
   border-radius: 1rem;
   padding: 1rem 2rem;
   max-width: 600px;
@@ -78,15 +78,22 @@ body {
 }
 
 .instructions-box h3 {
-  color: #e0f2fe;
+  color: #000000;
   font-size: 1rem;
   margin-bottom: 0.5rem;
 }
 
 .instructions-box p {
-  color: #a5f3fc;
+  color: #000000;
   font-size: 0.875rem;
   line-height: 1.4;
+}
+
+.side-note {
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: rgba(0, 0, 0, 0.7);
+  font-style: italic;
 }
 
 .close-instructions {
@@ -95,7 +102,7 @@ body {
   right: 0.5rem;
   background: none;
   border: none;
-  color: #a5f3fc;
+  color: #000000;
   cursor: pointer;
   font-size: 1.2rem;
   transition: all 0.2s ease;
@@ -103,7 +110,7 @@ body {
 }
 
 .close-instructions:hover {
-  color: #06b6d4;
+  color: #020303;
   transform: scale(1.2);
 }
 
@@ -117,18 +124,18 @@ body {
   color: #a5f3fc;
   text-shadow: 0 0 30px rgba(34, 211, 238, 0.9), 
                0 0 60px rgba(34, 211, 238, 0.6);
-  max-width: 20%;
+  max-width: 25%;
   z-index: 100;
   pointer-events: none;
-  animation: floatingLyricUp 4s ease-out forwards;
+  animation: floatingLyricUp 6s ease-out forwards;
 }
 
 .floating-lyric:nth-child(even) {
-  left: 2rem;
+  /* Handled by inline style */
 }
 
 .floating-lyric:nth-child(odd) {
-  right: 2rem;
+  /* Handled by inline style */
 }
 
 @keyframes floatingLyricUp {
@@ -251,19 +258,17 @@ body {
 /* Tonearm */
 .tonearm {
   position: absolute;
-  right: 1rem;
-  top: -1rem;
+  right: -2rem;
+  top: 2rem;
   width: 9rem;
   height: 0.8rem;
-  transform-origin: left center;
-  transition: transform 1.5s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-origin: bottom left;
+  transition: transform 1s cubic-bezier(0.4, 0, 0.2, 1);
   filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.3));
 }
 
 .tonearm.playing {
-  transform: rotate(35deg);
-  right: 3rem;
-  top: 3rem;
+  transform: rotate(12deg);
 }
 
 .tonearm-body {
@@ -327,7 +332,7 @@ body {
   font-size: 0.875rem;
 }
 
-/* === PROGRESS BAR === */
+/* === PROGRESS BAR ===*/
 
 .progress-section {
   margin-bottom: 1.5rem;
@@ -473,7 +478,7 @@ body {
   box-shadow: 0 0 15px rgba(34, 211, 238, 0.8);
 }
 
-/* === UPLOAD SECTION === */
+/* ===UPLOAD SECTION=== */
 
 .upload-section {
   text-align: center;
@@ -552,7 +557,7 @@ body {
   margin-top: 0.75rem;
 }
 
-/* === LYRICS MENU === */
+/* === LYRICS MENU ===*/
 
 .lyrics-menu {
   position: fixed;
@@ -711,7 +716,7 @@ body {
   }
 }
 
-/* === RESPONSIVE DESIGN === */
+/* === RESPONSIVE DESIGN ===*/
 
 @media (max-width: 1024px) {
   .queue-menu {
@@ -794,13 +799,18 @@ body {
   }
 
   .tonearm {
-    right: 1rem;
-    top: -0.5rem;
+    right: -2rem;
+    top: 2rem;
     width: 7rem;
   }
 
   .tonearm.playing {
-    right: 2.5rem;
-    top: 2rem;
+    transform: rotate(12deg);
+  }
+
+  .floating-lyric {
+    font-size: 1.1rem;
+    bottom: 6rem;
+    max-width: 35%;
   }
 }
