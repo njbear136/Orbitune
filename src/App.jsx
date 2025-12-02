@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Upload, Play, Pause, SkipBack, SkipForward, FileText } from 'lucide-react';
 
 function App() {
-  // STATE
   const [songs, setSongs] = useState([]);
   const [currentSongIndex, setCurrentSongIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -14,6 +13,8 @@ function App() {
   const [volume, setVolume] = useState(0.7);
   const [isLoading, setIsLoading] = useState(false);
   const [showQueue, setShowQueue] = useState(false);
+  const [showLyricsMenu, setShowLyricsMenu] = useState(false);
+  const [showInstructions, setShowInstructions] = useState(true);
   
   // REFS
   const audioRef = useRef(null);
@@ -83,6 +84,7 @@ function App() {
           
           resolve(null);
         } catch (error) {
+          console.error('Error extracting album art:', error);
           resolve(null);
         }
       };
@@ -92,12 +94,11 @@ function App() {
     });
   };
 
-  // HANDLE FILE UPLOAD - Keep playing current song
+  // HANDLE FILE UPLOAD
   const handleFileUpload = async (e) => {
     const files = Array.from(e.target.files);
     setIsLoading(true);
     
-    // Save current playback state
     const wasPlaying = isPlaying;
     const currentPlaybackTime = audioRef.current?.currentTime || 0;
     const currentAudioSrc = audioRef.current?.src;
@@ -119,7 +120,6 @@ function App() {
     const newSongs = [...songs, ...processedSongs];
     setSongs(newSongs);
     
-    // Restore playback state immediately
     if (audioRef.current && currentAudioSrc) {
       audioRef.current.src = currentAudioSrc;
       audioRef.current.currentTime = currentPlaybackTime;
@@ -138,6 +138,10 @@ function App() {
   // HANDLE LYRICS UPLOAD
   const handleLyricsUpload = async (e) => {
     const files = Array.from(e.target.files);
+    
+    const wasPlaying = isPlaying;
+    const currentPlaybackTime = audioRef.current?.currentTime || 0;
+    const currentAudioSrc = audioRef.current?.src;
     
     for (const file of files) {
       const lyricsFileName = file.name.replace('.txt', '');
@@ -160,6 +164,14 @@ function App() {
             return song;
           })
         );
+        
+        if (audioRef.current && currentAudioSrc) {
+          audioRef.current.src = currentAudioSrc;
+          audioRef.current.currentTime = currentPlaybackTime;
+          if (wasPlaying) {
+            audioRef.current.play().catch(err => console.log('Play error:', err));
+          }
+        }
       };
       
       reader.readAsText(file);
@@ -217,15 +229,13 @@ function App() {
     const handleTimeUpdate = () => {
       setCurrentTime(audio.currentTime);
       
-      // Update lyrics based on time - continuous flow
       if (songs[currentSongIndex]?.lyrics.length > 0) {
         const currentLyrics = songs[currentSongIndex].lyrics;
-        // Show lyrics based on: each lyric shows for 5 seconds
-        const lyricIndex = Math.floor(audio.currentTime / 5);
-        if (lyricIndex < currentLyrics.length && lyricIndex !== currentLyricIndex) {
+        const lyricIndex = Math.floor(audio.currentTime / 4) % currentLyrics.length;
+        
+        if (lyricIndex !== currentLyricIndex) {
           setCurrentLyricIndex(lyricIndex);
           
-          // Add to floating lyrics array
           const newLyric = {
             id: Date.now() + Math.random(),
             text: currentLyrics[lyricIndex],
@@ -233,10 +243,9 @@ function App() {
           };
           setFloatingLyrics(prev => [...prev, newLyric]);
           
-          // Remove after animation completes
           setTimeout(() => {
             setFloatingLyrics(prev => prev.filter(l => l.id !== newLyric.id));
-          }, 4000);
+          }, 6000);
         }
       }
     };
@@ -261,7 +270,7 @@ function App() {
     };
   }, [currentSongIndex, songs, currentLyricIndex]);
 
-  // HANDLE SONG CHANGES - Auto play new song
+  // HANDLE SONG CHANGES
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio || songs.length === 0) return;
@@ -276,7 +285,6 @@ function App() {
     audio.src = currentSong.url;
     audio.load();
     
-    // Always auto-play when song changes
     setTimeout(() => {
       audio.play()
         .then(() => setIsPlaying(true))
@@ -303,19 +311,22 @@ function App() {
   };
 
   const currentSong = songs[currentSongIndex];
-  const currentLyric = currentSong?.lyrics[currentLyricIndex] || '';
 
   return (
     <div className="app-container">
       
       <div className="ocean-wave"></div>
 
-      {/* Floating Lyrics */}
+      {showInstructions && (
+        <div className="instructions-box">
+          <button onClick={() => setShowInstructions(false)} className="close-instructions">✕</button>
+          <h3>Quick Guide</h3>
+          <p>1. Upload songs → 2. Upload lyrics (name files same as songs) → 3. Play & enjoy! Use Queue to select songs.</p>
+        </div>
+      )}
+
       {floatingLyrics.map(lyric => (
-        <div
-          key={lyric.id}
-          className="floating-lyric"
-        >
+        <div key={lyric.id} className="floating-lyric">
           {lyric.text}
         </div>
       ))}
@@ -324,7 +335,6 @@ function App() {
         
         <div className="spotlight"></div>
         
-        {/* Vinyl Record*/}
         <div className="vinyl-container">
           <div className="vinyl-record">
             
@@ -356,7 +366,6 @@ function App() {
               </div>
             </div>
             
-            {/* Pretty Tonearm */}
             <div className={`tonearm ${isPlaying ? 'playing' : ''}`}>
               <div className="tonearm-body">
                 <div className="tonearm-needle"></div>
@@ -365,7 +374,6 @@ function App() {
           </div>
         </div>
 
-        {/* Controls Card */}
         <div className="controls-card">
           
           <div className="song-title-section">
@@ -375,7 +383,6 @@ function App() {
             <p className="player-subtitle">Upload your music library and enjoy them being played</p>
           </div>
 
-          {/* Progress Bar with Seek */}
           {currentSong && (
             <div className="progress-section">
               <div 
@@ -399,37 +406,20 @@ function App() {
             </div>
           )}
 
-          {/* Control Buttons */}
           <div className="controls-buttons">
-            <button
-              onClick={prevSong}
-              disabled={songs.length === 0}
-              className="control-btn"
-              aria-label="Previous"
-            >
+            <button onClick={prevSong} disabled={songs.length === 0} className="control-btn">
               <SkipBack size={24} />
             </button>
             
-            <button
-              onClick={togglePlay}
-              disabled={songs.length === 0 || isLoading}
-              className="control-btn play-btn"
-              aria-label={isPlaying ? 'Pause' : 'Play'}
-            >
+            <button onClick={togglePlay} disabled={songs.length === 0 || isLoading} className="control-btn play-btn">
               {isPlaying ? <Pause size={32} /> : <Play size={32} />}
             </button>
             
-            <button
-              onClick={nextSong}
-              disabled={songs.length === 0}
-              className="control-btn"
-              aria-label="Next"
-            >
+            <button onClick={nextSong} disabled={songs.length === 0} className="control-btn">
               <SkipForward size={24} />
             </button>
           </div>
 
-          {/* Volume Control */}
           {currentSong && (
             <div className="volume-section">
               <label className="volume-label">
@@ -447,48 +437,27 @@ function App() {
             </div>
           )}
 
-          {/* Upload and Queue Buttons */}
           <div className="upload-section">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="audio/*"
-              multiple
-              onChange={handleFileUpload}
-              style={{ display: 'none' }}
-            />
-            <input
-              ref={lyricsInputRef}
-              type="file"
-              accept=".txt"
-              multiple
-              onChange={handleLyricsUpload}
-              style={{ display: 'none' }}
-            />
+            <input ref={fileInputRef} type="file" accept="audio/*" multiple onChange={handleFileUpload} style={{ display: 'none' }} />
+            <input ref={lyricsInputRef} type="file" accept=".txt" multiple onChange={handleLyricsUpload} style={{ display: 'none' }} />
             
             <div className="upload-buttons">
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isLoading}
-                className="upload-btn"
-              >
+              <button onClick={() => fileInputRef.current?.click()} disabled={isLoading} className="upload-btn">
                 <Upload size={20} />
                 {isLoading ? 'Loading...' : 'Upload Songs'}
               </button>
               
-              <button
-                onClick={() => lyricsInputRef.current?.click()}
-                className="upload-btn lyrics-btn"
-              >
+              <button onClick={() => lyricsInputRef.current?.click()} className="upload-btn lyrics-btn">
                 <FileText size={20} />
                 Upload Lyrics
               </button>
 
-              <button
-                onClick={() => setShowQueue(!showQueue)}
-                className="upload-btn queue-btn"
-              >
+              <button onClick={() => setShowQueue(!showQueue)} className="upload-btn queue-btn">
                 Queue ({songs.length})
+              </button>
+
+              <button onClick={() => setShowLyricsMenu(!showLyricsMenu)} className="upload-btn lyrics-menu-btn">
+                Lyrics Files
               </button>
             </div>
             
@@ -501,7 +470,6 @@ function App() {
         </div>
       </div>
 
-      {/* Queue Menu */}
       {showQueue && (
         <div className="queue-menu">
           <div className="queue-header">
@@ -510,11 +478,7 @@ function App() {
           </div>
           <div className="queue-list">
             {songs.map((song, index) => (
-              <div
-                key={index}
-                onClick={() => selectSong(index)}
-                className={`queue-item ${index === currentSongIndex ? 'active' : ''}`}
-              >
+              <div key={index} onClick={() => selectSong(index)} className={`queue-item ${index === currentSongIndex ? 'active' : ''}`}>
                 <span className="queue-number">{index + 1}</span>
                 <span className="queue-name">{song.name}</span>
                 {index === currentSongIndex && <span className="playing-indicator">▶</span>}
@@ -524,7 +488,26 @@ function App() {
         </div>
       )}
 
-      {/* Hidden Audio */}
+      {showLyricsMenu && (
+        <div className="lyrics-menu">
+          <div className="queue-header">
+            <h3>Lyrics Files</h3>
+            <button onClick={() => setShowLyricsMenu(false)} className="close-btn">✕</button>
+          </div>
+          <div className="queue-list">
+            {songs.filter(song => song.lyrics.length > 0).map((song, index) => (
+              <div key={index} className="queue-item">
+                <span className="queue-name">{song.name}</span>
+                <span className="lyrics-count">{song.lyrics.length} lines</span>
+              </div>
+            ))}
+            {songs.filter(song => song.lyrics.length > 0).length === 0 && (
+              <p className="no-lyrics">No lyrics uploaded yet</p>
+            )}
+          </div>
+        </div>
+      )}
+
       <audio ref={audioRef} preload="metadata" />
     </div>
   );
