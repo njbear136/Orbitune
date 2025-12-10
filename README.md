@@ -13,28 +13,44 @@ interface, floating animated lyrics, and a beautiful ocean-inspired design.
 - 🎚️ Volume control and playback controls
 - ⏭️ Next/Previous track navigation
 
-##WEBSITE DEMO:
+## WEBSITE DEMO:
 https://njbear136.github.io/Orbitune/
 
-##INSTALLATION STEPS:
+## INSTALLATION STEPS:
 No installation needed! Orbitune is live and ready to use:
+
 Just click the link above and start using the app in your browser.
 
-Local Development Setup:
+## Local Development Setup:
 If you want to contribute or modify the project locally, follow these steps:
-Prerequisites
+
+Prerequisites:
 
 Node.js (v14 or higher)
+
 Git
 
 Steps:
+
 1.Clone the repository:
-bash: git clone https://github.com/njbear136/Orbitune
+
+bash: 
+
+      git clone https://github.com/njbear136/Orbitune
+
       cd orbitune
 2. Install Dependencies:
-bash: npm install
+
+bash: 
+     
+     npm install
+
 3. Start development server:
-bash: npm run dev
+
+bash: 
+     
+     npm run dev
+
 - The app will run locally at a local host link
 
 # App built with React, Vite, Javascript and CSS.
